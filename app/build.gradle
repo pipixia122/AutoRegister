@@ -49,7 +49,7 @@ dependencies {
     register(new CategoryB()); //scanSuperClass的子类
   }
  */
-// apply plugin: 'auto-register'
+apply plugin: 'auto-register'
 project.ext.registerInfoList = [
     [
         'scanInterface'             : 'com.billy.app_lib_interface.ICategory'
@@ -71,7 +71,7 @@ project.ext.registerInfoList = [
     ]
 ]
 
-//autoregister {
-//    registerInfo = registerInfoList
-//    cacheEnabled = true
-//}
+autoregister {
+    registerInfo = registerInfoList
+    cacheEnabled = true
+}
