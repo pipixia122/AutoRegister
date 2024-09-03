@@ -1,6 +1,9 @@
 package com.billy.android.register
 
+import org.objectweb.asm.Opcodes
+
 import java.util.regex.Pattern
+
 /**
  * aop的配置信息
  * @author billy.qi
@@ -20,15 +23,16 @@ class RegisterInfo {
     String registerMethodName = ''
     ArrayList<String> include = []
     ArrayList<String> exclude = []
+    int amsApiVersion = Opcodes.ASM6
 
     //以下不是可配置参数
-    ArrayList<Pattern> includePatterns = []
-    ArrayList<Pattern> excludePatterns = []
+    List<Pattern> includePatterns = []
+    List<Pattern> excludePatterns = []
     File fileContainsInitClass //initClassName的class文件或含有initClassName类的jar文件
-    ArrayList<String> classList = new ArrayList<>()
+    List<String> classList = new ArrayList<>()
 
 
-    RegisterInfo(){}
+    RegisterInfo() {}
 
     void reset() {
         fileContainsInitClass = null
@@ -63,7 +67,9 @@ class RegisterInfo {
         exclude.each { i ->
             sb.append('\n\t\t\'').append(i).append('\'')
         }
-        sb.append('\n\t]\n}')
+        sb.append('\n\t]')
+        sb.append('\n\t').append('amsApiVersion').append('\t\t\t=\t').append(amsApiVersion)
+        sb.append('\n}')
         return sb.toString()
     }
 
@@ -102,7 +108,7 @@ class RegisterInfo {
         return str ? str.replaceAll('\\.', '/').intern() : str
     }
 
-    private static void initPattern(ArrayList<String> list, ArrayList<Pattern> patterns) {
+    private static void initPattern(List<String> list, List<Pattern> patterns) {
         list.each { s ->
             patterns.add(Pattern.compile(s))
         }

@@ -1,6 +1,7 @@
 package com.billy.android.register
 
 import org.gradle.api.Project
+import org.objectweb.asm.Opcodes
 
 /**
  * aop的配置信息
@@ -9,12 +10,13 @@ import org.gradle.api.Project
  */
 class AutoRegisterConfig {
 
-    public ArrayList<Map<String, Object>> registerInfo = []
+    public List<Map<String, Object>> registerInfo = []
 
-    ArrayList<RegisterInfo> list = new ArrayList<>()
+    List<RegisterInfo> list = new ArrayList<>()
 
     Project project
     def cacheEnabled = true
+    def amsApiVersion = Opcodes.ASM6
 
     AutoRegisterConfig() {}
 
@@ -26,7 +28,7 @@ class AutoRegisterConfig {
             if (!superClasses) {
                 superClasses = new ArrayList<String>()
             } else if (superClasses instanceof String) {
-                ArrayList<String> superList = new ArrayList<>()
+                List<String> superList = new ArrayList<>()
                 superList.add(superClasses)
                 superClasses = superList
             }
@@ -37,6 +39,7 @@ class AutoRegisterConfig {
             info.registerClassName = map.get('registerClassName') //注册方法所在的类
             info.include = map.get('include')
             info.exclude = map.get('exclude')
+            info.amsApiVersion = amsApiVersion
             info.init()
             if (info.validate())
                 list.add(info)
@@ -61,7 +64,7 @@ class AutoRegisterConfig {
 
         if (!registerInfo.exists()) {
             registerInfo.createNewFile()
-        } else if(registerInfo.canRead()) {
+        } else if (registerInfo.canRead()) {
             def info = registerInfo.text
             sameInfo = info == listInfo
             if (!sameInfo) {
@@ -97,6 +100,7 @@ class AutoRegisterConfig {
     String toString() {
         StringBuilder sb = new StringBuilder(RegisterPlugin.EXT_NAME).append(' = {')
                 .append('\n  cacheEnabled = ').append(cacheEnabled)
+                .append('\n  amsApiVersion = ').append(amsApiVersion)
                 .append('\n  registerInfo = [\n')
         def size = list.size()
         for (int i = 0; i < size; i++) {
