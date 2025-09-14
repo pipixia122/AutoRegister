@@ -18,9 +18,12 @@ class RegisterInfo {
     String interfaceName = ''
     ArrayList<String> superClassNames = []
     String initClassName = ''
-    String initMethodName = ''
+    String initMethodName = '' // 用于向后兼容，对应于新的 methodName
+    String methodName = '' // AGP 8.x 版本使用的方法名
     String registerClassName = ''
     String registerMethodName = ''
+    String registerMethodDesc = '(Ljava/lang/Object;)V' // 注册方法描述符
+    String methodDesc = '()V' // 目标方法描述符
     ArrayList<String> include = []
     ArrayList<String> exclude = []
     int amsApiVersion = Opcodes.ASM6
@@ -30,13 +33,14 @@ class RegisterInfo {
     List<Pattern> excludePatterns = []
     File fileContainsInitClass //initClassName的class文件或含有initClassName类的jar文件
     List<String> classList = new ArrayList<>()
-
+    boolean hasInitClass = false // 标记是否找到初始化类
 
     RegisterInfo() {}
 
     void reset() {
         fileContainsInitClass = null
         classList.clear()
+        hasInitClass = false
     }
 
     boolean validate() {
@@ -94,6 +98,12 @@ class RegisterInfo {
         //默认插入到static块中
         if (!initMethodName)
             initMethodName = "<clinit>"
+        
+        // AGP 8.x 兼容：设置 methodName 和 methodDesc
+        if (!methodName) {
+            methodName = initMethodName
+        }
+        
         registerClassName = convertDotToSlash(registerClassName)
         //添加默认的排除项
         DEFAULT_EXCLUDE.each { e ->

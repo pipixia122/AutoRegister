@@ -1,7 +1,6 @@
 package com.billy.android.register
 
-import com.android.build.gradle.AppExtension
-import com.android.build.gradle.AppPlugin
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 /**
@@ -17,15 +16,24 @@ public class RegisterPlugin implements Plugin<Project> {
         /**
          * 注册transform接口
          */
-        def isApp = project.plugins.hasPlugin(AppPlugin)
         project.extensions.create(EXT_NAME, AutoRegisterConfig)
-        if (isApp) {
+        
+        // 查找Android应用组件扩展
+        def androidComponents = project.extensions.findByType(ApplicationAndroidComponentsExtension)
+        if (androidComponents) {
             println 'project(' + project.name + ') apply auto-register plugin'
-            def android = project.extensions.getByType(AppExtension)
             def transformImpl = new RegisterTransform(project)
-            android.registerTransform(transformImpl)
-            project.afterEvaluate {
-                init(project, transformImpl)//此处要先于transformImpl.transform方法执行
+            
+            androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+                // 初始化配置
+                init(project, transformImpl)
+                
+                // 使用AGP 8.x的方式注册Transform
+                variant.instrumentation.transformClassesWith(RegisterAsmClassVisitorFactory.class, 
+                        InstrumentationScope.ALL) { params ->
+                    // 传递配置给ClassVisitorFactory
+                    params.config.set(transformImpl.config)
+                }
             }
         }
     }

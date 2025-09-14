@@ -1,174 +1,112 @@
 package com.billy.android.register
 
-import org.apache.commons.io.IOUtils
-import org.objectweb.asm.*
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
 
-import java.util.jar.JarEntry
-import java.util.jar.JarFile
-import java.util.jar.JarOutputStream
-import java.util.zip.ZipEntry
 /**
- *
+ * AGP 8.x 兼容的代码插入处理器
+ * 负责在指定类的指定方法中插入注册代码
  * @author billy.qi
  * @since 17/3/20 11:48
  */
 class CodeInsertProcessor {
-    RegisterInfo extension
 
-    private CodeInsertProcessor(RegisterInfo extension) {
-        this.extension = extension
-    }
-
-    static void insertInitCodeTo(RegisterInfo extension) {
-        if (extension != null && !extension.classList.isEmpty()) {
-            CodeInsertProcessor processor = new CodeInsertProcessor(extension)
-            File file = extension.fileContainsInitClass
-            if (file.getName().endsWith('.jar'))
-                processor.generateCodeIntoJarFile(file)
-            else
-                processor.generateCodeIntoClassFile(file)
-        }
-    }
-
-    //处理jar包中的class代码注入
-    private File generateCodeIntoJarFile(File jarFile) {
-        if (jarFile) {
-            def optJar = new File(jarFile.getParent(), jarFile.name + ".opt")
-            if (optJar.exists())
-                optJar.delete()
-            def file = new JarFile(jarFile)
-            Enumeration enumeration = file.entries()
-            JarOutputStream jarOutputStream = new JarOutputStream(new FileOutputStream(optJar))
-
-            while (enumeration.hasMoreElements()) {
-                JarEntry jarEntry = (JarEntry) enumeration.nextElement()
-                String entryName = jarEntry.getName()
-                ZipEntry zipEntry = new ZipEntry(entryName)
-                InputStream inputStream = file.getInputStream(jarEntry)
-                jarOutputStream.putNextEntry(zipEntry)
-                if (isInitClass(entryName)) {
-                    println('generate code into:' + entryName)
-                    def bytes = doGenerateCode(inputStream)
-                    jarOutputStream.write(bytes)
-                } else {
-                    jarOutputStream.write(IOUtils.toByteArray(inputStream))
-                }
-                inputStream.close()
-                jarOutputStream.closeEntry()
-            }
-            jarOutputStream.close()
-            file.close()
-
-            if (jarFile.exists()) {
-                jarFile.delete()
-            }
-            optJar.renameTo(jarFile)
-        }
-        return jarFile
-    }
-
-    boolean isInitClass(String entryName) {
-        if (entryName == null || !entryName.endsWith(".class"))
-            return false
-        if (extension.initClassName) {
-            entryName = entryName.substring(0, entryName.lastIndexOf('.'))
-            return extension.initClassName == entryName
-        }
-        return false
-    }
     /**
-     * 处理class的注入
-     * @param file class文件
-     * @return 修改后的字节码文件内容
+     * 在指定的初始化类中插入注册代码
+     * @param registerInfo 注册信息
+     * @return 处理结果
      */
-    private byte[] generateCodeIntoClassFile(File file) {
-        def optClass = new File(file.getParent(), file.name + ".opt")
-
-        FileInputStream inputStream = new FileInputStream(file)
-        FileOutputStream outputStream = new FileOutputStream(optClass)
-
-        def bytes = doGenerateCode(inputStream)
-        outputStream.write(bytes)
-        inputStream.close()
-        outputStream.close()
-        if (file.exists()) {
-            file.delete()
+    byte[] insertInitCode(RegisterInfo registerInfo, byte[] classData) {
+        if (!registerInfo.hasInitClass || registerInfo.classList.isEmpty()) {
+            return classData
         }
-        optClass.renameTo(file)
-        return bytes
+
+        try {
+            // 转换类名为内部名格式（使用斜杠分隔）
+            String initClassName = registerInfo.initClassName.replace('.', '/')
+            ClassReader reader = new ClassReader(classData)
+            ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES)
+            
+            // 创建类访问器，在访问方法时插入注册代码
+            reader.accept(new MyClassVisitor(Opcodes.ASM9, writer, registerInfo), 0)
+            return writer.toByteArray()
+        } catch (Exception e) {
+            e.printStackTrace()
+            return classData
+        }
     }
 
-    private byte[] doGenerateCode(InputStream inputStream) {
-        ClassReader cr = new ClassReader(inputStream)
-        ClassWriter cw = new ClassWriter(cr, 0)
-        ClassVisitor cv = new MyClassVisitor(extension.amsApiVersion, cw)
-        cr.accept(cv, ClassReader.EXPAND_FRAMES)
-        return cw.toByteArray()
-    }
-
+    /**
+     * ASM类访问器，用于向指定方法中插入代码
+     */
     class MyClassVisitor extends ClassVisitor {
+        private RegisterInfo registerInfo
+        private String className
 
-        MyClassVisitor(int api, ClassVisitor cv) {
+        MyClassVisitor(int api, ClassVisitor cv, RegisterInfo registerInfo) {
             super(api, cv)
+            this.registerInfo = registerInfo
         }
 
+        @Override
         void visit(int version, int access, String name, String signature,
                    String superName, String[] interfaces) {
             super.visit(version, access, name, signature, superName, interfaces)
+            this.className = name
         }
+
         @Override
-        MethodVisitor visitMethod(int access, String name, String desc,
-                                  String signature, String[] exceptions) {
-            MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions)
-            if (name == extension.initMethodName) { //注入代码到指定的方法之中
-                boolean _static = (access & Opcodes.ACC_STATIC) > 0
-                mv = new MyMethodVisitor(extension.amsApiVersion, mv, _static)
+        MethodVisitor visitMethod(int access, String name, String descriptor,
+                                 String signature, String[] exceptions) {
+            MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions)
+            
+            // 检查是否为需要注入代码的方法
+            if (name.equals(registerInfo.methodName) && descriptor.equals(registerInfo.methodDesc)) {
+                // 创建方法访问器用于代码生成
+                return new MyMethodVisitor(mv, access, name, descriptor, registerInfo)
             }
             return mv
         }
     }
 
+    /**
+     * ASM方法访问器，用于在方法中插入代码
+     */
     class MyMethodVisitor extends MethodVisitor {
-        boolean _static;
+        private RegisterInfo registerInfo
 
-        MyMethodVisitor(int api, MethodVisitor mv, boolean _static) {
-            super(api, mv)
-            this._static = _static;
+        MyMethodVisitor(MethodVisitor mv, int access, String name, String desc, RegisterInfo registerInfo) {
+            super(Opcodes.ASM9, mv)
+            this.registerInfo = registerInfo
         }
 
         @Override
         void visitInsn(int opcode) {
-            if ((opcode >= Opcodes.IRETURN && opcode <= Opcodes.RETURN)) {
-                extension.classList.each { name ->
-                    if (!_static) {
-                        //加载this
-                        mv.visitVarInsn(Opcodes.ALOAD, 0)
-                    }
-                    //用无参构造方法创建一个组件实例
-                    mv.visitTypeInsn(Opcodes.NEW, name)
-                    mv.visitInsn(Opcodes.DUP)
-                    mv.visitMethodInsn(Opcodes.INVOKESPECIAL, name, "<init>", "()V", false)
-                    //调用注册方法将组件实例注册到组件库中
-                    if (_static) {
-                        mv.visitMethodInsn(Opcodes.INVOKESTATIC
-                                , extension.registerClassName
-                                , extension.registerMethodName
-                                , "(L${extension.interfaceName};)V"
-                                , false)
-                    } else {
-                        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL
-                                , extension.registerClassName
-                                , extension.registerMethodName
-                                , "(L${extension.interfaceName};)V"
-                                , false)
-                    }
-                }
+            // 在方法返回前插入注册代码
+            if (opcode == Opcodes.RETURN) {
+                insertCode(registerInfo)
             }
             super.visitInsn(opcode)
         }
-        @Override
-        void visitMaxs(int maxStack, int maxLocals) {
-            super.visitMaxs(maxStack + 4, maxLocals)
+
+        /**
+         * 插入注册代码
+         */
+        private void insertCode(RegisterInfo registerInfo) {
+            // 对于每个需要注册的类，生成注册代码
+            for (String className : registerInfo.classList) {
+                // 1. 创建类的实例
+                mv.visitTypeInsn(Opcodes.NEW, className.replace('.', '/'))
+                mv.visitInsn(Opcodes.DUP)
+                mv.visitMethodInsn(Opcodes.INVOKESPECIAL, className.replace('.', '/'), "<init>", "()V", false)
+                
+                // 2. 调用注册方法
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, registerInfo.initClassName.replace('.', '/'),
+                        registerInfo.registerMethodName, registerInfo.registerMethodDesc, false)
+            }
         }
     }
 }
