@@ -19,9 +19,46 @@ class CodeScanProcessor {
     Map<String, ScanJarHarvest> cacheMap
     Set<String> cachedJarContainsInitClass = new HashSet<>()
 
+    // 添加无参构造函数，用于AGP 8.x的调用方式
+    CodeScanProcessor() {
+        this.infoList = new ArrayList<>()
+        this.cacheMap = new HashMap<>()
+    }
+    
+    // 保留原有的构造函数，用于向后兼容
     CodeScanProcessor(ArrayList<RegisterInfo> infoList, Map<String, ScanJarHarvest> cacheMap) {
         this.infoList = infoList
         this.cacheMap = cacheMap
+    }
+
+    // 设置注册信息列表，用于在AGP 8.x环境中动态设置
+    void setInfoList(ArrayList<RegisterInfo> infoList) {
+        this.infoList = infoList
+    }
+
+    /**
+     * 检查是否应该扫描此类
+     */
+    boolean shouldScanClass(String className, RegisterInfo info) {
+        if (className == null) {
+            return false
+        }
+        
+        // 检查是否需要处理此类
+        if (!shouldProcessThisClassForRegister(info, className)) {
+            return false
+        }
+        
+        // 检查排除模式
+        if (info.excludePatterns != null) {
+            for (Pattern excludePattern : info.excludePatterns) {
+                if (excludePattern.matcher(className).matches()) {
+                    return false
+                }
+            }
+        }
+        
+        return true
     }
 
     /**

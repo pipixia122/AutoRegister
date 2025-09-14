@@ -84,7 +84,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
             RegisterInfo info = new RegisterInfo()
             info.init(infoStr)
             
-            // 如果是初始化类或者需要扫描的类，则进行处理
+            // 使用正确的方法调用方式
             if (info.hasInitClass || scanProcessor.shouldScanClass(classData.className, info)) {
                 return true
             }
