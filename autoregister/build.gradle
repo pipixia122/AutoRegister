@@ -22,7 +22,7 @@ afterEvaluate {
                 from components.java
                 groupId "com.github.pipixia122"
                 artifactId "AutoRegister"
-                version "1.4.4"
+                version "1.4.10"
             }
         }
     }
