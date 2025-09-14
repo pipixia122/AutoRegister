@@ -1,6 +1,7 @@
 package com.billy.android.register
 
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import com.android.build.api.instrumentation.InstrumentationScope
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 /**
