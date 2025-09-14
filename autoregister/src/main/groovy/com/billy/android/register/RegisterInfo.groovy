@@ -77,6 +77,68 @@ class RegisterInfo {
         return sb.toString()
     }
 
+    void init(String infoStr) {
+        // 解析字符串格式的配置信息
+        if (!infoStr) {
+            init()
+            return
+        }
+        
+        try {
+            // 解析scanInterface
+            def interfaceMatch = infoStr =~ /scanInterface\s*=\s*(.+)/
+            if (interfaceMatch.find()) {
+                interfaceName = interfaceMatch.group(1).trim()
+            }
+            
+            // 解析scanSuperClasses
+            def superClassMatch = infoStr =~ /scanSuperClasses\s*=\s*\[(.*?)\]/
+            if (superClassMatch.find()) {
+                superClassNames = new ArrayList<String>()
+                def superClassStr = superClassMatch.group(1).trim()
+                if (superClassStr) {
+                    superClassStr.split(',').each { className ->
+                        className = className.trim().replaceAll(/'/, '').trim()
+                        if (className) {
+                            superClassNames.add(className)
+                        }
+                    }
+                }
+            }
+            
+            // 解析codeInsertToClassName
+            def initClassMatch = infoStr =~ /codeInsertToClassName\s*=\s*(.+)/
+            if (initClassMatch.find()) {
+                initClassName = initClassMatch.group(1).trim()
+            }
+            
+            // 解析codeInsertToMethodName
+            def initMethodMatch = infoStr =~ /codeInsertToMethodName\s*=\s*(.+)/
+            if (initMethodMatch.find()) {
+                initMethodName = initMethodMatch.group(1).trim()
+            }
+            
+            // 解析registerMethodName
+            def registerMethodMatch = infoStr =~ /registerMethodName\s*=\s*public static void\s+([^\.]+)\.([^\s]+)/
+            if (registerMethodMatch.find()) {
+                registerClassName = registerMethodMatch.group(1).trim()
+                registerMethodName = registerMethodMatch.group(2).trim()
+            }
+            
+            // 解析amsApiVersion
+            def apiVersionMatch = infoStr =~ /amsApiVersion\s*=\s*(\d+)/
+            if (apiVersionMatch.find()) {
+                amsApiVersion = apiVersionMatch.group(1).trim() as Integer
+            }
+            
+            // 调用无参init方法完成剩余初始化
+            init()
+        } catch (Exception e) {
+            // 如果解析失败，使用默认值初始化
+            init()
+        }
+    }
+
     void init() {
         if (include == null) include = new ArrayList<>()
         if (include.empty) include.add(".*") //如果没有设置则默认为include所有

@@ -33,7 +33,12 @@ public class RegisterPlugin implements Plugin<Project> {
                 variant.instrumentation.transformClassesWith(RegisterAsmClassVisitorFactory.class, 
                         InstrumentationScope.ALL) { params ->
                     // 传递配置给ClassVisitorFactory
-                    params.config.set(transformImpl.config)
+                    List<String> registerInfoStrings = new ArrayList<>()
+                    for (RegisterInfo info : transformImpl.config.list) {
+                        registerInfoStrings.add(info.toString())
+                    }
+                    params.getRegisterInfos().set(registerInfoStrings)
+                    params.getEnabled().set(true)
                 }
             }
         }
