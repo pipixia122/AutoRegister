@@ -26,7 +26,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         Property<Boolean> getEnabled()
         
         @InputFiles
-        FileCollection getConfigFiles()
+        Property<FileCollection> getConfigFiles()
         
         @Input
         ListProperty<String> getRegisterInfos()
