@@ -5,16 +5,21 @@ import com.android.build.api.instrumentation.InstrumentationScope
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import com.billy.android.register.RegisterInfo
+import com.billy.android.register.RegisterTransform
+import com.billy.android.register.AutoRegisterConfig
+import java.lang.reflect.Method
+import java.lang.reflect.Field
+
 /**
  * 自动注册插件入口
  * @author billy.qi
  * @since 17/3/14 17:35
  */
-public class RegisterPlugin implements Plugin<Project> {
+class RegisterPlugin implements Plugin<Project> {
     public static final String EXT_NAME = 'autoregister'
 
     @Override
-    public void apply(Project project) {
+    void apply(Project project) {
         /**
          * 注册transform接口
          */
@@ -38,41 +43,10 @@ public class RegisterPlugin implements Plugin<Project> {
                     for (RegisterInfo info : transformImpl.config.list) {
                         registerInfoStrings.add(info.toString())
                     }
-                    // 在AGP 8.x中，我们需要使用Groovy的动态方法调用
-                    // 使用respondsTo()来安全地检查对象是否支持特定方法
-                    try {
-                        // 尝试直接调用set方法 - 这是AGP 7.x的方式
-                        if (params.metaClass.respondsTo(params, 'registerInfos')) {
-                            params.registerInfos.set(registerInfoStrings)
-                            params.enabled.set(true)
-                        }
-                        // 如果直接访问属性失败，尝试调用setter方法 - 这是AGP 8.x的方式
-                        else if (params.metaClass.respondsTo(params, 'setRegisterInfos')) {
-                            params.setRegisterInfos(registerInfoStrings)
-                            params.setEnabled(true)
-                        }
-                        // 如果上述都失败，尝试通过反射设置值
-                        else {
-                            println 'Warning: Using fallback reflection method to set parameters'
-                            def registerInfosField = params.getClass().getDeclaredField('registerInfos')
-                            registerInfosField.setAccessible(true)
-                            registerInfosField.set(params, registerInfoStrings)
-                            
-                            def enabledField = params.getClass().getDeclaredField('enabled')
-                            enabledField.setAccessible(true)
-                            enabledField.set(params, true)
-                        }
-                    } catch (Exception e) {
-                        println 'Error setting parameters: ' + e.getMessage()
-                        // 最后尝试使用最原始的方式
-                        try {
-                            // 这是最通用的方式，尝试直接设置值
-                            params.invokeMethod('setRegisterInfos', registerInfoStrings)
-                            params.invokeMethod('setEnabled', true)
-                        } catch (Exception ex) {
-                            println 'Critical error: Failed to set parameters in any way'
-                        }
-                    }
+                    
+                    // AGP 8.x 兼容的参数设置方式
+                    // 使用多层次策略确保参数正确设置
+                    setParametersSafely(params, registerInfoStrings)
                 }
             }
         }
@@ -83,5 +57,148 @@ public class RegisterPlugin implements Plugin<Project> {
         config.project = project
         config.convertConfig()
         transformImpl.config = config
+    }
+    
+    /**
+     * 安全地设置参数，支持AGP 7.x和AGP 8.x
+     */
+    private static void setParametersSafely(Object params, List<String> registerInfoStrings) {
+        boolean paramsSet = false
+        
+        try {
+            // 策略1: 尝试使用Java反射API调用setter方法
+            try {
+                Class<?> paramsClass = params.getClass()
+                
+                // 尝试设置registerInfos
+                try {
+                    Method setRegisterInfosMethod = findMethod(paramsClass, 'setRegisterInfos', List)
+                    if (setRegisterInfosMethod != null) {
+                        setRegisterInfosMethod.invoke(params, registerInfoStrings)
+                        
+                        // 尝试设置enabled
+                        Method setEnabledMethod = findMethod(paramsClass, 'setEnabled', boolean.class)
+                        if (setEnabledMethod != null) {
+                            setEnabledMethod.invoke(params, true)
+                            paramsSet = true
+                        }
+                    }
+                } catch (Exception ignored) {}
+                
+                // 如果策略1失败，尝试策略2: 通过字段访问设置值
+                if (!paramsSet) {
+                    // 尝试获取并设置registerInfos字段
+                    Field registerInfosField = findField(paramsClass, 'registerInfos')
+                    if (registerInfosField != null) {
+                        registerInfosField.setAccessible(true)
+                        def fieldValue = registerInfosField.get(params)
+                        
+                        // 如果fieldValue是Provider类型，尝试设置其值
+                        if (fieldValue != null) {
+                            try {
+                                Method setMethod = findMethod(fieldValue.getClass(), 'set', List)
+                                if (setMethod != null) {
+                                    setMethod.invoke(fieldValue, registerInfoStrings)
+                                } else {
+                                    // 尝试addAll方法
+                                    Method addAllMethod = findMethod(fieldValue.getClass(), 'addAll', Collection)
+                                    if (addAllMethod != null) {
+                                        addAllMethod.invoke(fieldValue, registerInfoStrings)
+                                    } else {
+                                        // 直接设置字段值
+                                        registerInfosField.set(params, registerInfoStrings)
+                                    }
+                                }
+                            } catch (Exception ex) {
+                                // 直接设置字段值
+                                registerInfosField.set(params, registerInfoStrings)
+                            }
+                        }
+                        
+                        // 尝试获取并设置enabled字段
+                        Field enabledField = findField(paramsClass, 'enabled')
+                        if (enabledField != null) {
+                            enabledField.setAccessible(true)
+                            def enabledValue = enabledField.get(params)
+                            
+                            // 如果enabledValue是Provider类型，尝试设置其值
+                            if (enabledValue != null) {
+                                try {
+                                    Method setMethod = findMethod(enabledValue.getClass(), 'set', boolean.class)
+                                    if (setMethod != null) {
+                                        setMethod.invoke(enabledValue, true)
+                                        paramsSet = true
+                                    }
+                                } catch (Exception ex) {
+                                    // 直接设置字段值
+                                    enabledField.set(params, true)
+                                    paramsSet = true
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // 所有策略都失败，尝试使用Groovy的动态特性
+                try {
+                    // 使用Groovy的动态能力尝试多种方式
+                    if (params.hasProperty('setParameters')) {
+                        params.setParameters(['registerInfos': registerInfoStrings, 'enabled': true])
+                        paramsSet = true
+                    } else if (params.metaClass.respondsTo(params, 'setProperty')) {
+                        params.setProperty('registerInfos', registerInfoStrings)
+                        params.setProperty('enabled', true)
+                        paramsSet = true
+                    } else {
+                        // 最极端的情况，尝试直接赋值
+                        params.'registerInfos' = registerInfoStrings
+                        params.'enabled' = true
+                        paramsSet = true
+                    }
+                } catch (Exception ex) {
+                    println 'Critical error: Failed to set parameters in all attempted ways'
+                }
+            }
+        } catch (Exception e) {
+            println 'Unexpected error setting parameters: ' + e.getMessage()
+        }
+    }
+    
+    /**
+     * 安全地查找方法，避免NoSuchMethodException
+     */
+    private static Method findMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
+        try {
+            return clazz.getMethod(methodName, parameterTypes)
+        } catch (NoSuchMethodException e) {
+            // 尝试查找所有方法，包括父类的
+            Class<?> currentClass = clazz
+            while (currentClass != null) {
+                try {
+                    return currentClass.getDeclaredMethod(methodName, parameterTypes)
+                } catch (NoSuchMethodException ignored) {}
+                currentClass = currentClass.getSuperclass()
+            }
+            return null
+        }
+    }
+    
+    /**
+     * 安全地查找字段，避免NoSuchFieldException
+     */
+    private static Field findField(Class<?> clazz, String fieldName) {
+        try {
+            return clazz.getField(fieldName)
+        } catch (NoSuchFieldException e) {
+            // 尝试查找所有字段，包括父类的和私有字段
+            Class<?> currentClass = clazz
+            while (currentClass != null) {
+                try {
+                    return currentClass.getDeclaredField(fieldName)
+                } catch (NoSuchFieldException ignored) {}
+                currentClass = currentClass.getSuperclass()
+            }
+            return null
+        }
     }
 }

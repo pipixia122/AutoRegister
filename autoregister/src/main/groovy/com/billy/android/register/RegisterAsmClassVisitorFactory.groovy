@@ -12,6 +12,7 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
+import java.lang.reflect.Method
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
@@ -57,8 +58,50 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
     @Override
     ClassVisitor createClassVisitor(ClassContext classContext, 
                                    ClassVisitor nextClassVisitor) {
-        // 从参数中获取注册信息
-        List<String> registerInfoStrings = getParameters().getRegisterInfos().get()
+        // 从参数中获取注册信息 - 兼容AGP 8.x的安全方式
+        List<String> registerInfoStrings = new ArrayList<>()
+        try {
+            // 尝试标准方式
+            Object parameters = getParameters()
+            if (parameters != null) {
+                // 检查是否有getRegisterInfos方法
+                if (parameters.metaClass.respondsTo(parameters, 'getRegisterInfos')) {
+                    def registerInfosProperty = parameters.getRegisterInfos()
+                    if (registerInfosProperty != null && registerInfosProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
+                        registerInfoStrings = registerInfosProperty.get()
+                    }
+                }
+                // 如果上述方式失败，尝试直接访问属性
+                else if (parameters.hasProperty('registerInfos')) {
+                    def registerInfosProperty = parameters.getProperty('registerInfos')
+                    if (registerInfosProperty != null && registerInfosProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
+                        registerInfoStrings = registerInfosProperty.get()
+                    }
+                }
+                // 如果仍然失败，尝试反射方式
+                else {
+                    try {
+                        Class<?> paramsClass = parameters.getClass()
+                        Method getRegisterInfosMethod = paramsClass.getMethod('getRegisterInfos')
+                        def registerInfosProperty = getRegisterInfosMethod.invoke(parameters)
+                        if (registerInfosProperty != null) {
+                            Method getMethod = registerInfosProperty.getClass().getMethod('get')
+                            registerInfoStrings = getMethod.invoke(registerInfosProperty)
+                        }
+                    } catch (Exception ignored) {
+                        println 'Warning: Failed to get registerInfos via reflection'
+                    }
+                }
+            }
+        } catch (Exception e) {
+            println 'Error getting registerInfos: ' + e.getMessage()
+        }
+        
+        // 确保registerInfoStrings不为null
+        if (registerInfoStrings == null) {
+            registerInfoStrings = new ArrayList<>()
+        }
+        
         List<RegisterInfo> registerInfos = new ArrayList<>()
         
         // 解析注册信息
@@ -77,8 +120,49 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
 
     @Override
     boolean isInstrumentable(ClassData classData) {
-        // 获取所有注册信息
-        List<String> registerInfoStrings = getParameters().getRegisterInfos().get()
+        // 获取所有注册信息 - 兼容AGP 8.x的安全方式
+        List<String> registerInfoStrings = new ArrayList<>()
+        try {
+            // 尝试标准方式
+            Object parameters = getParameters()
+            if (parameters != null) {
+                // 检查是否有getRegisterInfos方法
+                if (parameters.metaClass.respondsTo(parameters, 'getRegisterInfos')) {
+                    def registerInfosProperty = parameters.getRegisterInfos()
+                    if (registerInfosProperty != null && registerInfosProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
+                        registerInfoStrings = registerInfosProperty.get()
+                    }
+                }
+                // 如果上述方式失败，尝试直接访问属性
+                else if (parameters.hasProperty('registerInfos')) {
+                    def registerInfosProperty = parameters.getProperty('registerInfos')
+                    if (registerInfosProperty != null && registerInfosProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
+                        registerInfoStrings = registerInfosProperty.get()
+                    }
+                }
+                // 如果仍然失败，尝试反射方式
+                else {
+                    try {
+                        Class<?> paramsClass = parameters.getClass()
+                        Method getRegisterInfosMethod = paramsClass.getMethod('getRegisterInfos')
+                        def registerInfosProperty = getRegisterInfosMethod.invoke(parameters)
+                        if (registerInfosProperty != null) {
+                            Method getMethod = registerInfosProperty.getClass().getMethod('get')
+                            registerInfoStrings = getMethod.invoke(registerInfosProperty)
+                        }
+                    } catch (Exception ignored) {
+                        // 忽略异常，保持向后兼容性
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 忽略异常，保持向后兼容性
+        }
+        
+        // 确保registerInfoStrings不为null
+        if (registerInfoStrings == null) {
+            registerInfoStrings = new ArrayList<>()
+        }
         
         for (String infoStr : registerInfoStrings) {
             RegisterInfo info = new RegisterInfo()
