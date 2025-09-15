@@ -47,6 +47,8 @@ class RegisterPlugin implements Plugin<Project> {
                     List<String> registerInfoStrings = new ArrayList<>()
                     for (RegisterInfo info : transformImpl.config.list) {
                         registerInfoStrings.add(info.toString())
+                        // 打印详细的注册信息
+                        println "[AutoRegister] Register info: ${info.toString()}"
                         project.logger.debug("[AutoRegister] Added register info: ${info.interfaceName ?: info.superClassNames}")
                     }
                     
