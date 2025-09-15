@@ -5,6 +5,7 @@ import com.android.build.api.instrumentation.ClassContext
 import com.android.build.api.instrumentation.ClassData
 import com.android.build.api.instrumentation.InstrumentationParameters
 import org.gradle.api.file.FileCollection
+import org.gradle.api.internal.provider.DefaultProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
@@ -144,6 +145,10 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
             Object parameters = getParameters()
             println "[AutoRegister] getParameters() in isInstrumentable returned: ${parameters?.getClass()?.getName() ?: 'NULL'}"
             if (parameters != null) {
+                if (parameters.class == DefaultProperty) {
+                    println "[AutoRegister] Warning: Parameters is of type DefaultProperty, unexpected in this context"
+                    return false
+                }
                 println "[AutoRegister] Parameters class: ${parameters.getClass().getName()}"
                 println "[AutoRegister] Parameters toString: ${parameters.toString()}"
                 // 检查是否启用
