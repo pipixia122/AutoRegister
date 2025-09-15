@@ -38,8 +38,8 @@ public class RegisterPlugin implements Plugin<Project> {
                     for (RegisterInfo info : transformImpl.config.list) {
                         registerInfoStrings.add(info.toString())
                     }
-                    params.getRegisterInfos().set(registerInfoStrings)
-                    params.getEnabled().set(true)
+                    params.registerInfos.set(registerInfoStrings)
+                    params.enabled.set(true)
                 }
             }
         }
