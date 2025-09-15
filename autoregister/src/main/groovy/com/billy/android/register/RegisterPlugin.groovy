@@ -38,8 +38,19 @@ public class RegisterPlugin implements Plugin<Project> {
                     for (RegisterInfo info : transformImpl.config.list) {
                         registerInfoStrings.add(info.toString())
                     }
-                    params.registerInfos.set(registerInfoStrings)
-                    params.enabled.set(true)
+                    // 在AGP 8.x中，我们需要将参数直接传递给参数对象
+                    // 通过将参数对象转换为Map来设置值
+                    Map<String, Object> paramsMap = params as Map
+                    if (paramsMap.containsKey('setRegisterInfos')) {
+                        paramsMap.setRegisterInfos(registerInfoStrings)
+                    } else {
+                        println 'Warning: Failed to set registerInfos'
+                    }
+                    if (paramsMap.containsKey('setEnabled')) {
+                        paramsMap.setEnabled(true)
+                    } else {
+                        println 'Warning: Failed to set enabled'
+                    }
                 }
             }
         }
