@@ -24,24 +24,30 @@ class RegisterPlugin implements Plugin<Project> {
          * 注册transform接口
          */
         project.extensions.create(EXT_NAME, AutoRegisterConfig)
+        project.logger.info("[AutoRegister] Plugin initialized in project: ${project.name}")
         
         // 查找Android应用组件扩展
         def androidComponents = project.extensions.findByType(ApplicationAndroidComponentsExtension)
         if (androidComponents) {
+            project.logger.info("[AutoRegister] Found ApplicationAndroidComponentsExtension, applying plugin")
             println 'project(' + project.name + ') apply auto-register plugin'
             def transformImpl = new RegisterTransform(project)
             
             androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+                project.logger.info("[AutoRegister] Processing variant: ${variant.name}")
                 // 初始化配置
                 init(project, transformImpl)
+                project.logger.info("[AutoRegister] Configuration initialized for variant: ${variant.name}, registerInfo count: ${transformImpl.config.list.size()}")
                 
                 // 使用AGP 8.x的方式注册Transform
                 variant.instrumentation.transformClassesWith(RegisterAsmClassVisitorFactory.class, 
                         InstrumentationScope.ALL) { params ->
+                    project.logger.info("[AutoRegister] Configuring ClassVisitorFactory for variant: ${variant.name}")
                     // 传递配置给ClassVisitorFactory
                     List<String> registerInfoStrings = new ArrayList<>()
                     for (RegisterInfo info : transformImpl.config.list) {
                         registerInfoStrings.add(info.toString())
+                        project.logger.debug("[AutoRegister] Added register info: ${info.interfaceName ?: info.superClassNames}")
                     }
                     
                     // AGP 8.x 兼容的参数设置方式
