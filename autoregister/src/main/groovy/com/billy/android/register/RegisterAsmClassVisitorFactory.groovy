@@ -58,7 +58,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
     ClassVisitor createClassVisitor(ClassContext classContext, 
                                    ClassVisitor nextClassVisitor) {
         // 从参数中获取注册信息
-        List<String> registerInfoStrings = getParameters().getRegisterInfos().get()
+        List<String> registerInfoStrings = getParameters().registerInfos.get()
         List<RegisterInfo> registerInfos = new ArrayList<>()
         
         // 解析注册信息
@@ -78,7 +78,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
     @Override
     boolean isInstrumentable(ClassData classData) {
         // 获取所有注册信息
-        List<String> registerInfoStrings = getParameters().getRegisterInfos().get()
+        List<String> registerInfoStrings = getParameters().registerInfos.get()
         
         for (String infoStr : registerInfoStrings) {
             RegisterInfo info = new RegisterInfo()
