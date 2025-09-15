@@ -27,6 +27,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
 
     interface Parameters extends InstrumentationParameters {
         @Input
+        @Optional
         Property<Boolean> getEnabled()
         
         @InputFiles
@@ -35,6 +36,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         Property<FileCollection> getConfigFiles()
         
         @Input
+        @Optional
         ListProperty<String> getRegisterInfos()
     }
 
