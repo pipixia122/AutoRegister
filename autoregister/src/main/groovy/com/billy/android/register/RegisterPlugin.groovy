@@ -7,6 +7,8 @@ import org.gradle.api.Project
 import com.billy.android.register.RegisterInfo
 import com.billy.android.register.RegisterTransform
 import com.billy.android.register.AutoRegisterConfig
+import org.gradle.api.provider.Property
+
 import java.lang.reflect.Method
 import java.lang.reflect.Field
 
@@ -90,6 +92,8 @@ class RegisterPlugin implements Plugin<Project> {
                 // 尝试设置registerInfos
                 try {
                     Method setRegisterInfosMethod = findMethod(paramsClass, 'setRegisterInfo', String)
+                    Method setRegisterInfosMethodProperty = findMethod(paramsClass, 'setRegisterInfo', Property)
+                    println "[AutoRegister] setRegisterInfosMethodProperty method is null: ${setRegisterInfosMethodProperty == null}"
                     if (setRegisterInfosMethod != null) {
                         println "[AutoRegister] Found setRegisterInfo method: ${setRegisterInfosMethod.getName()}"
                         setRegisterInfosMethod.invoke(params, registerInfoStrings.get(0))
