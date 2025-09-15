@@ -226,6 +226,8 @@ class RegisterPlugin implements Plugin<Project> {
      */
     private static Method findMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
         try {
+            println "[AutoRegister] Trying to find method: ${methodName} with ${parameterTypes.length} parameters"
+            println "[AutoRegister] all methods: ${clazz.methods.collect { it.name }.join(', ')}"
             return clazz.getMethod(methodName, parameterTypes)
         } catch (NoSuchMethodException e) {
             // 尝试查找所有方法，包括父类的
