@@ -60,6 +60,8 @@ class RegisterPlugin implements Plugin<Project> {
 
     static void init(Project project, RegisterTransform transformImpl) {
         AutoRegisterConfig config = project.extensions.findByName(EXT_NAME) as AutoRegisterConfig
+        println("[AutoRegister] Initializing configuration for project: ${project.name}")
+        project.logger.info("[AutoRegister] Initializing configuration for project: ${project.name}")
         config.project = project
         config.convertConfig()
         transformImpl.config = config

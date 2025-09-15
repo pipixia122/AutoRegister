@@ -135,7 +135,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
 
     @Override
     boolean isInstrumentable(ClassData classData) {
-        println "[AutoRegister] Checking if class is instrumentable: ${classData.className}"
+//        println "[AutoRegister] Checking if class is instrumentable: ${classData.className}"
         
         // 获取所有注册信息和启用状态 - 兼容AGP 8.x的安全方式
         List<String> registerInfoStrings = new ArrayList<>()
@@ -144,10 +144,10 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         try {
             // 尝试标准方式
             Object parameters = getParameters()
-            println "[AutoRegister] getParameters() in isInstrumentable returned: ${parameters?.getClass()?.getName() ?: 'NULL'}"
+//            println "[AutoRegister] getParameters() in isInstrumentable returned: ${parameters?.getClass()?.getName() ?: 'NULL'}"
             if (parameters != null) {
-                println "[AutoRegister] Parameters class: ${parameters.getClass().getName()}"
-                println "[AutoRegister] Parameters toString: ${parameters.toString()}"
+//                println "[AutoRegister] Parameters class: ${parameters.getClass().getName()}"
+//                println "[AutoRegister] Parameters toString: ${parameters.toString()}"
                 // 检查是否启用
                 try {
                     if (parameters.metaClass.respondsTo(parameters, 'getEnabled')) {
@@ -157,12 +157,12 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
                         }
                     }
                 } catch (Exception e) {
-                    println "[AutoRegister] Error getting enabled flag: ${e.getMessage()}"
+//                    println "[AutoRegister] Error getting enabled flag: ${e.getMessage()}"
                 }
                 
                 // 即使禁用，也打印详细日志以帮助调试
                 if (!enabled) {
-                    println "[AutoRegister] WARNING: Plugin is DISABLED! To enable, set enabled=true in your gradle config"
+//                    println "[AutoRegister] WARNING: Plugin is DISABLED! To enable, set enabled=true in your gradle config"
                     return false
                 }
                 
@@ -206,31 +206,31 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         
         // 如果没有注册信息，跳过扫描
         if (registerInfoStrings.isEmpty()) {
-            println "[AutoRegister] Skipping instrumentation as no register info available"
+//            println "[AutoRegister] Skipping instrumentation as no register info available"
             return false
         }
         
         // 输出详细的注册信息配置
-        println "[AutoRegister] Plugin is ENABLED with ${registerInfoStrings.size()} registration configurations:"
+//        println "[AutoRegister] Plugin is ENABLED with ${registerInfoStrings.size()} registration configurations:"
         
         for (String infoStr : registerInfoStrings) {
             RegisterInfo info = new RegisterInfo()
             info.init(infoStr)
             
-            println "[AutoRegister]   Registration:"
-            println "[AutoRegister]     Interface: ${info.interfaceName ?: 'none'}"
-            if (info.superClassNames) {
-                println "[AutoRegister]     Super classes: ${info.superClassNames}"
-            }
-            if (info.hasInitClass) {
-                println "[AutoRegister]     Init class: ${info.initClassName}"
-                println "[AutoRegister]     Register method: ${info.registerMethodName}(${info.registerMethodDesc})"
-            }
+//            println "[AutoRegister]   Registration:"
+//            println "[AutoRegister]     Interface: ${info.interfaceName ?: 'none'}"
+//            if (info.superClassNames) {
+//                println "[AutoRegister]     Super classes: ${info.superClassNames}"
+//            }
+//            if (info.hasInitClass) {
+//                println "[AutoRegister]     Init class: ${info.initClassName}"
+//                println "[AutoRegister]     Register method: ${info.registerMethodName}(${info.registerMethodDesc})"
+//            }
             
             // 使用临时创建的CodeScanProcessor检查是否需要扫描
             CodeScanProcessor scanProcessor = new CodeScanProcessor()
             boolean shouldScan = scanProcessor.shouldScanClass(classData.className, info)
-            println "[AutoRegister] Class ${classData.className} should be scanned for ${info.interfaceName ?: info.superClassNames}: ${shouldScan}"
+//            println "[AutoRegister] Class ${classData.className} should be scanned for ${info.interfaceName ?: info.superClassNames}: ${shouldScan}"
             
             if (info.hasInitClass || shouldScan) {
                 println "[AutoRegister] Class ${classData.className} is instrumentable"
