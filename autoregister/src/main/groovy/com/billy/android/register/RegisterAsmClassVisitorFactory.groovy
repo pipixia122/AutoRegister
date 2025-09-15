@@ -5,7 +5,6 @@ import com.android.build.api.instrumentation.ClassContext
 import com.android.build.api.instrumentation.ClassData
 import com.android.build.api.instrumentation.InstrumentationParameters
 import org.gradle.api.file.FileCollection
-import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
@@ -13,7 +12,6 @@ import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import java.lang.reflect.Method
-import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.MethodVisitor
@@ -37,7 +35,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         
         @Input
         @Optional
-        ListProperty<String> getRegisterInfos()
+        Property<String> getRegisterInfo()
     }
 
     /**
@@ -69,21 +67,21 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
             if (parameters != null) {
                 println "[AutoRegister] Parameters class: ${parameters.getClass().getName()}"
                 println "[AutoRegister] Parameters toString: ${parameters.toString()}"
-                // 检查是否有getRegisterInfos方法
-                if (parameters.metaClass.respondsTo(parameters, 'getRegisterInfos')) {
-                    println "[AutoRegister] Found getRegisterInfos method"
-                    def registerInfosProperty = parameters.getRegisterInfos()
-                    if (registerInfosProperty != null && registerInfosProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
-                        registerInfoStrings = registerInfosProperty.get()
-                        println "[AutoRegister] Successfully got registerInfoStrings via getRegisterInfos.get(): count=${registerInfoStrings?.size()}"
+                // 检查是否有getRegisterInfo方法
+                if (parameters.metaClass.respondsTo(parameters, 'getRegisterInfo')) {
+                    println "[AutoRegister] Found getRegisterInfo method"
+                    def registerInfoProperty = parameters.getRegisterInfo()
+                    if (registerInfoProperty != null && registerInfoProperty.metaClass.respondsTo(registerInfoProperty, 'get')) {
+                        registerInfoStrings.add(registerInfoProperty.get() as String)
+                        println "[AutoRegister] Successfully got registerInfoStrings via getRegisterInfo.get(): count=${registerInfoStrings?.size()}"
                     }
                 }
                 // 如果上述方式失败，尝试直接访问属性
-                else if (parameters.hasProperty('registerInfos')) {
+                else if (parameters.hasProperty('registerInfo')) {
                     println "[AutoRegister] Trying via property access"
-                    def registerInfosProperty = parameters.getProperty('registerInfos')
-                    if (registerInfosProperty != null && registerInfosProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
-                        registerInfoStrings = registerInfosProperty.get()
+                    def registerInfoProperty = parameters.getProperty('registerInfo')
+                    if (registerInfoProperty != null && registerInfoProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
+                        registerInfoStrings.add(registerInfosroperty.get() as String)
                         println "[AutoRegister] Successfully got registerInfoStrings via property.get(): count=${registerInfoStrings?.size()}"
                     }
                 }
@@ -92,7 +90,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
                     try {
                         println "[AutoRegister] Trying via reflection"
                         Class<?> paramsClass = parameters.getClass()
-                        Method getRegisterInfosMethod = paramsClass.getMethod('getRegisterInfos')
+                        Method getRegisterInfosMethod = paramsClass.getMethod('getRegisterInfo')
                         def registerInfosProperty = getRegisterInfosMethod.invoke(parameters)
                         if (registerInfosProperty != null) {
                             Method getMethod = registerInfosProperty.getClass().getMethod('get')
@@ -167,28 +165,28 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
                 }
                 
                 // 检查是否有getRegisterInfos方法
-                if (parameters.metaClass.respondsTo(parameters, 'getRegisterInfos')) {
-                    def registerInfosProperty = parameters.getRegisterInfos()
+                if (parameters.metaClass.respondsTo(parameters, 'getRegisterInfo')) {
+                    def registerInfosProperty = parameters.getRegisterInfo()
                     if (registerInfosProperty != null && registerInfosProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
-                        registerInfoStrings = registerInfosProperty.get()
+                        registerInfoStrings.add(registerInfosProperty.get() as String)
                     }
                 }
                 // 如果上述方式失败，尝试直接访问属性
-                else if (parameters.hasProperty('registerInfos')) {
-                    def registerInfosProperty = parameters.getProperty('registerInfos')
+                else if (parameters.hasProperty('registerInfo')) {
+                    def registerInfosProperty = parameters.getProperty('registerInfo')
                     if (registerInfosProperty != null && registerInfosProperty.metaClass.respondsTo(registerInfosProperty, 'get')) {
-                        registerInfoStrings = registerInfosProperty.get()
+                        registerInfoStrings.add(registerInfosProperty.get() as String)
                     }
                 }
                 // 如果仍然失败，尝试反射方式
                 else {
                     try {
                         Class<?> paramsClass = parameters.getClass()
-                        Method getRegisterInfosMethod = paramsClass.getMethod('getRegisterInfos')
+                        Method getRegisterInfosMethod = paramsClass.getMethod('getRegisterInfo')
                         def registerInfosProperty = getRegisterInfosMethod.invoke(parameters)
                         if (registerInfosProperty != null) {
                             Method getMethod = registerInfosProperty.getClass().getMethod('get')
-                            registerInfoStrings = getMethod.invoke(registerInfosProperty)
+                            registerInfoStrings.add(getMethod.invoke(registerInfosProperty) as String)
                         }
                     } catch (Exception ignored) {
                         // 忽略异常，保持向后兼容性
