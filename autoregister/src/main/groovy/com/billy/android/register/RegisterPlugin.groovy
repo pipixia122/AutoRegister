@@ -4,6 +4,7 @@ import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.api.instrumentation.InstrumentationScope
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import com.billy.android.register.RegisterInfo
 /**
  * 自动注册插件入口
  * @author billy.qi
@@ -50,5 +51,4 @@ public class RegisterPlugin implements Plugin<Project> {
         config.convertConfig()
         transformImpl.config = config
     }
-
 }
