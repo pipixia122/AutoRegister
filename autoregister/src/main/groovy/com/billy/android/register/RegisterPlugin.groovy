@@ -91,16 +91,14 @@ class RegisterPlugin implements Plugin<Project> {
                 
                 // 尝试设置registerInfos
                 try {
-                    Method setRegisterInfosMethod = findMethod(paramsClass, 'setRegisterInfo', String)
-                    Method setRegisterInfosMethodProperty = findMethod(paramsClass, 'setRegisterInfo', Property)
-                    println "[AutoRegister] setRegisterInfosMethodProperty method is null: ${setRegisterInfosMethodProperty == null}"
+                    Method setRegisterInfosMethod = findMethod(paramsClass, 'setRegisterInfo', Object)
                     if (setRegisterInfosMethod != null) {
                         println "[AutoRegister] Found setRegisterInfo method: ${setRegisterInfosMethod.getName()}"
                         setRegisterInfosMethod.invoke(params, registerInfoStrings.get(0))
                         println "[AutoRegister] Successfully invoked setRegisterInfo"
                         
                         // 尝试设置enabled
-                        Method setEnabledMethod = findMethod(paramsClass, 'setEnabled', boolean.class)
+                        Method setEnabledMethod = findMethod(paramsClass, 'setEnabled', Object)
                         if (setEnabledMethod != null) {
                             println "[AutoRegister] Found setEnabled method: ${setEnabledMethod.getName()}"
                             setEnabledMethod.invoke(params, true)
