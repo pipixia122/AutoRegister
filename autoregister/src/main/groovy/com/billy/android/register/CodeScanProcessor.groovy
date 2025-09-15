@@ -19,50 +19,9 @@ class CodeScanProcessor {
     Map<String, ScanJarHarvest> cacheMap
     Set<String> cachedJarContainsInitClass = new HashSet<>()
 
-    // 添加无参构造函数，用于AGP 8.x的调用方式
-    CodeScanProcessor() {
-        this.infoList = new ArrayList<>()
-        this.cacheMap = new HashMap<>()
-    }
-    
-    // 保留原有的构造函数，用于向后兼容
     CodeScanProcessor(ArrayList<RegisterInfo> infoList, Map<String, ScanJarHarvest> cacheMap) {
         this.infoList = infoList
         this.cacheMap = cacheMap
-    }
-
-    // 设置注册信息列表，用于在AGP 8.x环境中动态设置
-    void setInfoList(ArrayList<RegisterInfo> infoList) {
-        this.infoList = infoList
-    }
-
-    /**
-     * 检查是否应该扫描此类
-     */
-    boolean shouldScanClass(String className, RegisterInfo info) {
-        if (className == null) {
-            return false
-        }
-        
-        println "[AutoRegister] Checking if should scan class: ${className} for interface=${info.interfaceName ?: 'none'}"
-        // 检查是否需要处理此类
-        if (!shouldProcessThisClassForRegister(info, className)) {
-            println "[AutoRegister] Class ${className} does not match include patterns"
-            return false
-        }
-        
-        // 检查排除模式
-        if (info.excludePatterns != null) {
-            for (Pattern excludePattern : info.excludePatterns) {
-                if (excludePattern.matcher(className).matches()) {
-                    println "[AutoRegister] Class ${className} matches exclude pattern, skipping"
-                    return false
-                }
-            }
-        }
-        
-        println "[AutoRegister] Should scan class: ${className}"
-        return true
     }
 
     /**
@@ -74,60 +33,33 @@ class CodeScanProcessor {
             return false
         }
 
-        println "[AutoRegister] Scanning jar file: ${jarFile.absolutePath}"
         def srcFilePath = jarFile.absolutePath
-        
-        // 检查缓存
-        if (cachedJarContainsInitClass.contains(srcFilePath)) {
-            println "[AutoRegister] Jar ${srcFilePath} already scanned, skipping"
-            return true
+        def file = new JarFile(jarFile)
+        Enumeration enumeration = file.entries()
+
+        while (enumeration.hasMoreElements()) {
+            JarEntry jarEntry = enumeration.nextElement()
+            String entryName = jarEntry.getName()
+            
+            //support包不扫描
+            if (entryName.startsWith("android/support")) {
+                break
+            }
+            
+            // 直接处理类文件
+            if (entryName.endsWith(".class")) {
+                try {
+                    InputStream inputStream = file.getInputStream(jarEntry)
+                    scanClass(inputStream, srcFilePath, entryName)
+                    inputStream.close()
+                } catch (Exception e) {
+                    e.printStackTrace()
+                }
+            }
         }
         
-        try {
-            def file = new JarFile(jarFile)
-            Enumeration enumeration = file.entries()
-            int processedEntries = 0
-            int classFiles = 0
-
-            while (enumeration.hasMoreElements()) {
-                JarEntry jarEntry = enumeration.nextElement()
-                String entryName = jarEntry.getName()
-                processedEntries++
-                
-                //support包不扫描
-                if (entryName.startsWith("android/support")) {
-                    println "[AutoRegister] Skipping Android support package in jar"
-                    continue
-                }
-                
-                // 直接处理类文件
-                if (entryName.endsWith(".class")) {
-                    classFiles++
-                    try {
-                        InputStream inputStream = file.getInputStream(jarEntry)
-                        boolean scanned = scanClass(inputStream, srcFilePath, entryName)
-                        if (scanned) {
-                            println "[AutoRegister] Successfully scanned class: ${entryName} in jar"
-                        }
-                        inputStream.close()
-                    } catch (Exception e) {
-                        println "[AutoRegister] Error scanning class ${entryName}: ${e.getMessage()}"
-                        e.printStackTrace()
-                    }
-                }
-            }
-            
-            println "[AutoRegister] Scanned ${classFiles} class files out of ${processedEntries} entries in jar"
-            
-            // 标记为已扫描
-            cachedJarContainsInitClass.add(srcFilePath)
-            
-            if (file != null) {
-                file.close()
-            }
-        } catch (Exception e) {
-            println "[AutoRegister] Error scanning jar file ${srcFilePath}: ${e.getMessage()}"
-            e.printStackTrace()
+        if (file != null) {
+            file.close()
         }
         
         return true
@@ -142,7 +74,6 @@ class CodeScanProcessor {
         }
         
         String className = entryName.substring(0, entryName.lastIndexOf('.'))
-        println "[AutoRegister] Checking if ${className} is an init class"
         boolean found = false
         
         infoList.each { ext ->
@@ -151,7 +82,6 @@ class CodeScanProcessor {
                 // 而是通过 ClassVisitor 处理时直接注入代码
                 ext.hasInitClass = true
                 found = true
-                println "[AutoRegister] Found init class: ${className} for interface=${ext.interfaceName ?: 'none'}"
             }
         }
         
@@ -208,32 +138,17 @@ class CodeScanProcessor {
             // 转换为内部类名格式
             String className = entryName.substring(0, entryName.lastIndexOf('.'))
             
-            println "[AutoRegister] Scanning class file: ${entryName} from ${filePath}"
-            
             // 检查是否需要处理此类
             if (!shouldProcessClass(entryName)) {
-                println "[AutoRegister] Class ${className} does not need processing"
                 return false
-            }
-            
-            // 检查初始化类
-            boolean isInitClass = checkInitClass(entryName)
-            if (isInitClass) {
-                println "[AutoRegister] Class ${className} is an init class, no further scanning needed"
-                return true
             }
             
             ClassReader cr = new ClassReader(inputStream)
             ScanClassVisitor cv = new ScanClassVisitor(Opcodes.ASM9, className)
             cr.accept(cv, ClassReader.EXPAND_FRAMES)
             
-            if (cv.found) {
-                println "[AutoRegister] Class ${className} matched registration criteria"
-            }
-            
             return cv.found
         } catch (Exception e) {
-            println "[AutoRegister] Error scanning class ${entryName}: ${e.getMessage()}"
             e.printStackTrace()
             return false
         } finally {
@@ -268,35 +183,23 @@ class CodeScanProcessor {
         void visit(int version, int access, String name, String signature,
                    String superName, String[] interfaces) {
             // 跳过抽象类、接口和非public类
-            if (is(access, Opcodes.ACC_ABSTRACT)) {
-                println "[AutoRegister] Skipping abstract class: ${name}"
-                return
-            }
-            if (is(access, Opcodes.ACC_INTERFACE)) {
-                println "[AutoRegister] Skipping interface: ${name}"
-                return
-            }
-            if (!is(access, Opcodes.ACC_PUBLIC)) {
-                println "[AutoRegister] Skipping non-public class: ${name}"
+            if (is(access, Opcodes.ACC_ABSTRACT) ||
+                    is(access, Opcodes.ACC_INTERFACE) ||
+                    !is(access, Opcodes.ACC_PUBLIC)) {
                 return
             }
             
             // 转换为点分隔的类名格式
             String dotClassName = name.replace('/', '.')
-            println "[AutoRegister] Analyzing class: ${dotClassName}"
             
             infoList.each { info ->
                 if (shouldProcessThisClassForRegister(info, name)) {
-                    println "[AutoRegister] Class ${dotClassName} matches include patterns for ${info.interfaceName ?: info.superClassNames}"
-                    
                     // 检查超类
                     if (superName != null && superName != 'java/lang/Object' && !info.superClassNames.isEmpty()) {
                         for (String superClassName : info.superClassNames) {
-                            String superClassInternal = superClassName.replace('.', '/')
-                            if (superName.equals(superClassInternal)) {
+                            if (superName.equals(superClassName.replace('.', '/'))) {
                                 info.classList.add(dotClassName)
                                 found = true
-                                println "[AutoRegister] Class ${dotClassName} extends ${superClassName}, added to registration list"
                                 return
                             }
                         }
@@ -309,7 +212,6 @@ class CodeScanProcessor {
                             if (itName.equals(interfaceInternalName)) {
                                 info.classList.add(dotClassName)
                                 found = true
-                                println "[AutoRegister] Class ${dotClassName} implements ${info.interfaceName}, added to registration list"
                                 return
                             }
                         }
