@@ -65,8 +65,10 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         try {
             // 尝试标准方式
             Object parameters = getParameters()
+            println "[AutoRegister] getParameters() in createClassVisitor returned: ${parameters?.getClass()?.getName() ?: 'NULL'}"
             if (parameters != null) {
-                println "[AutoRegister] Getting parameters in createClassVisitor"
+                println "[AutoRegister] Parameters class: ${parameters.getClass().getName()}"
+                println "[AutoRegister] Parameters toString: ${parameters.toString()}"
                 // 检查是否有getRegisterInfos方法
                 if (parameters.metaClass.respondsTo(parameters, 'getRegisterInfos')) {
                     println "[AutoRegister] Found getRegisterInfos method"
@@ -142,7 +144,10 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         try {
             // 尝试标准方式
             Object parameters = getParameters()
+            println "[AutoRegister] getParameters() in isInstrumentable returned: ${parameters?.getClass()?.getName() ?: 'NULL'}"
             if (parameters != null) {
+                println "[AutoRegister] Parameters class: ${parameters.getClass().getName()}"
+                println "[AutoRegister] Parameters toString: ${parameters.toString()}"
                 // 检查是否启用
                 try {
                     if (parameters.metaClass.respondsTo(parameters, 'getEnabled')) {
