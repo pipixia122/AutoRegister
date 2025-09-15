@@ -37,17 +37,9 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         ListProperty<String> getRegisterInfos()
     }
 
-    // 扫描处理器
-    private CodeScanProcessor scanProcessor
-    // 代码插入处理器
-    private CodeInsertProcessor insertProcessor
-
-    RegisterAsmClassVisitorFactory() {
-        // 初始化处理器
-        scanProcessor = new CodeScanProcessor()
-        insertProcessor = new CodeInsertProcessor()
-    }
-
+    /**
+     * 创建ClassWriter，处理可能的异常
+     */
     ClassWriter createClassWriter(int flags) {
         return new ClassWriter(flags) {
             @Override
@@ -63,7 +55,7 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
     }
 
     @Override
-    ClassVisitor createClassVisitor(ClassContext classContext,
+    ClassVisitor createClassVisitor(ClassContext classContext, 
                                    ClassVisitor nextClassVisitor) {
         // 从参数中获取注册信息
         List<String> registerInfoStrings = getParameters().getRegisterInfos().get()
@@ -75,6 +67,9 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
             info.init(infoStr)
             registerInfos.add(info)
         }
+        
+        // 创建代码插入处理器
+        CodeInsertProcessor insertProcessor = new CodeInsertProcessor()
         
         // 返回注册类访问器
         return new RegisterClassVisitor(classContext, nextClassVisitor, registerInfos, insertProcessor)
@@ -89,7 +84,8 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
             RegisterInfo info = new RegisterInfo()
             info.init(infoStr)
             
-            // 使用正确的方法调用方式
+            // 使用临时创建的CodeScanProcessor检查是否需要扫描
+            CodeScanProcessor scanProcessor = new CodeScanProcessor()
             if (info.hasInitClass || scanProcessor.shouldScanClass(classData.className, info)) {
                 return true
             }
@@ -99,16 +95,16 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
     }
 
     /**
-     * 注册类访问器
+     * 注册类访问器 - 静态内部类以避免序列化问题
      * 负责识别需要处理的类并应用相应的变换
      */
-    class RegisterClassVisitor extends ClassVisitor {
-        private ClassContext classContext
-        private List<RegisterInfo> registerInfos
-        private CodeInsertProcessor insertProcessor
+    static class RegisterClassVisitor extends ClassVisitor {
+        private final ClassContext classContext
+        private final List<RegisterInfo> registerInfos
+        private final CodeInsertProcessor insertProcessor
         private String className
 
-        RegisterClassVisitor(ClassContext classContext, ClassVisitor cv,
+        RegisterClassVisitor(ClassContext classContext, ClassVisitor cv, 
                            List<RegisterInfo> registerInfos, CodeInsertProcessor insertProcessor) {
             super(Opcodes.ASM9, cv)
             this.classContext = classContext
@@ -117,14 +113,14 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
         }
 
         @Override
-        void visit(int version, int access, String name, String signature,
+        void visit(int version, int access, String name, String signature, 
                    String superName, String[] interfaces) {
             super.visit(version, access, name, signature, superName, interfaces)
             this.className = name
         }
 
         @Override
-        MethodVisitor visitMethod(int access, String name, String descriptor,
+        MethodVisitor visitMethod(int access, String name, String descriptor, 
                                  String signature, String[] exceptions) {
             // 获取原始方法访问器
             MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions)
@@ -144,11 +140,11 @@ abstract class RegisterAsmClassVisitorFactory implements AsmClassVisitorFactory<
     }
 
     /**
-     * 注册方法访问器
+     * 注册方法访问器 - 静态内部类以避免序列化问题
      * 负责在指定方法中插入注册代码
      */
-    class RegisterMethodVisitor extends MethodVisitor {
-        private RegisterInfo info
+    static class RegisterMethodVisitor extends MethodVisitor {
+        private final RegisterInfo info
 
         RegisterMethodVisitor(MethodVisitor mv, int access, String name, String desc, RegisterInfo info) {
             super(Opcodes.ASM9, mv)
