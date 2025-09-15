@@ -38,18 +38,40 @@ public class RegisterPlugin implements Plugin<Project> {
                     for (RegisterInfo info : transformImpl.config.list) {
                         registerInfoStrings.add(info.toString())
                     }
-                    // 在AGP 8.x中，我们需要将参数直接传递给参数对象
-                    // 通过将参数对象转换为Map来设置值
-                    Map<String, Object> paramsMap = params as Map
-                    if (paramsMap.containsKey('setRegisterInfos')) {
-                        paramsMap.setRegisterInfos(registerInfoStrings)
-                    } else {
-                        println 'Warning: Failed to set registerInfos'
-                    }
-                    if (paramsMap.containsKey('setEnabled')) {
-                        paramsMap.setEnabled(true)
-                    } else {
-                        println 'Warning: Failed to set enabled'
+                    // 在AGP 8.x中，我们需要使用Groovy的动态方法调用
+                    // 使用respondsTo()来安全地检查对象是否支持特定方法
+                    try {
+                        // 尝试直接调用set方法 - 这是AGP 7.x的方式
+                        if (params.metaClass.respondsTo(params, 'registerInfos')) {
+                            params.registerInfos.set(registerInfoStrings)
+                            params.enabled.set(true)
+                        }
+                        // 如果直接访问属性失败，尝试调用setter方法 - 这是AGP 8.x的方式
+                        else if (params.metaClass.respondsTo(params, 'setRegisterInfos')) {
+                            params.setRegisterInfos(registerInfoStrings)
+                            params.setEnabled(true)
+                        }
+                        // 如果上述都失败，尝试通过反射设置值
+                        else {
+                            println 'Warning: Using fallback reflection method to set parameters'
+                            def registerInfosField = params.getClass().getDeclaredField('registerInfos')
+                            registerInfosField.setAccessible(true)
+                            registerInfosField.set(params, registerInfoStrings)
+                            
+                            def enabledField = params.getClass().getDeclaredField('enabled')
+                            enabledField.setAccessible(true)
+                            enabledField.set(params, true)
+                        }
+                    } catch (Exception e) {
+                        println 'Error setting parameters: ' + e.getMessage()
+                        // 最后尝试使用最原始的方式
+                        try {
+                            // 这是最通用的方式，尝试直接设置值
+                            params.invokeMethod('setRegisterInfos', registerInfoStrings)
+                            params.invokeMethod('setEnabled', true)
+                        } catch (Exception ex) {
+                            println 'Critical error: Failed to set parameters in any way'
+                        }
                     }
                 }
             }
